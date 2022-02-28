@@ -1,3 +1,9 @@
+/*********************************************************************
+
+ *********************************************************************/
+
+/* Author:*/
+
 #include <pluginlib/class_loader.h>
 #include <ros/ros.h>
 
@@ -7,188 +13,168 @@
 #include <moveit/robot_state/robot_state.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
-#include <moveit_msgs/DisplayRobotState.h>
+
+#include <moveit_msgs/DisplayRobotState.h>	
 #include <moveit_msgs/DisplayTrajectory.h>
+
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/CollisionObject.h>
+
 #include <moveit_visual_tools/moveit_visual_tools.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-int main(int argc, char **argv)
+
+int main(int argc, char** argv)
 {
-	ros::init(argc, argv, "celal_robot");
+  ros::init(argc, argv, "origins");
 
-	ros::AsyncSpinner spinner(1);
-	spinner.start();
-
-	// Setting up to start using the RobotModel class is very easy. In
-	// general, you will find that most higher-level components will
-	// return a shared pointer to the RobotModel. You should always use
-	// that when possible. In this example, we will start with such a
-	// shared pointer and discuss only the basic API. You can have a
-	// look at the actual code API for these classes to get more
-	// information about how to use more features provided by these
-	// classes.
-	//
-	// We will start by instantiating a
-	// `RobotModelLoader`_
-	// object, which will look up
-	// the robot description on the ROS parameter server and construct a
-	// :moveit_core:`RobotModel` for us to use.
-	//
-	// .. _RobotModelLoader:
-	//     http://docs.ros.org/melodic/api/moveit_ros_planning/html/classrobot__model__loader_1_1RobotModelLoader.html
-
-	// Assumes that a robot has been loaded
-	// One approach is to use a launch file
-
-	robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-	robot_model::RobotModelPtr kinematic_model = robot_model_loader.getModel();
-	ROS_INFO("Model frame: %s", kinematic_model->getModelFrame().c_str());
-
-	// Using the :moveit_core:`RobotModel`, we can construct a
-	// :moveit_core:`RobotState` that maintains the configuration
-	// of the robot. We will set all joints in the state to their
-	// default values. We can then get a
-	// :moveit_core:`JointModelGroup`, which represents the robot
-	// model for a particular group, e.g. the "pr_arm" of the robot
-	// robot.
-
-	// Set the robot kinematic state
-	robot_state::RobotStatePtr kinematic_state(new robot_state::RobotState(kinematic_model));
-
-	kinematic_state->setToDefaultValues();
-
-	//MoveIt operates on sets of joints called “planning groups” and stores them in an object called the JointModelGroup.
-	//Throughout MoveIt the terms “planning group” and “joint model group” are used interchangably.
-	const robot_state::JointModelGroup *joint_model_group = kinematic_model->getJointModelGroup("celal_group");
-
-	const std::vector<std::string > &joint_names = joint_model_group->getVariableNames();
-
-	// Get Joint Values
-	// ^^^^^^^^^^^^^^^^
-	// We can retreive the current set of joint values stored in the state for the PR arm.
-	std::vector<double> joint_values;
-
-	kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
-
-	static
-	const std::string PLANNING_GROUP = "celal_group";
-	moveit::planning_interface::MoveGroupInterface move_group(PLANNING_GROUP);
-
-	// Planning using velocity kinematics
-	// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	//
-	// Let's set a joint space goal, find the velocities, displacements and move towards it. 
-	//
-	// To start, we'll create an pointer that references the current robot's state.
-	// RobotState is the object that contains all the current position/velocity/acceleration data.
-	moveit::core::RobotStatePtr current_state = move_group.getCurrentState();
-	//
-	// Next get the current set of joint values for the group.
-	std::vector<double> joint_group_positions;
-
-	// Define timesteps and t
-	double delta_t = 0.01;
-	double t = 0;
-
-	// Define the q_dot, d1_dot, theta2_dot, v, w, delta_o, delta_theta
-	
-	Eigen::Vector3d v, w, delta_o, delta_theta, q_dot;
-	Eigen::VectorXd vw;
-
-	current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
-
-	// Move to starting state
-	joint_group_positions[0] = 1.57079632679;
-	joint_group_positions[1] = 1.047197551;
-	joint_group_positions[2] = 2.0;
+  ros::AsyncSpinner spinner(1);
+  spinner.start();
 
 
-	move_group.setJointValueTarget(joint_group_positions);
-	move_group.move();
+  // Setting up to start using the RobotModel class is very easy. In
+  // general, you will find that most higher-level components will
+  // return a shared pointer to the RobotModel. You should always use
+  // that when possible. In this example, we will start with such a
+  // shared pointer and discuss only the basic API. You can have a
+  // look at the actual code API for these classes to get more
+  // information about how to use more features provided by these
+  // classes.
+  //
+  // We will start by instantiating a
+  // `RobotModelLoader`_
+  // object, which will look up
+  // the robot description on the ROS parameter server and construct a
+  // :moveit_core:`RobotModel` for us to use.
+  //
+  // .. _RobotModelLoader:
+  //     http://docs.ros.org/melodic/api/moveit_ros_planning/html/classrobot__model__loader_1_1RobotModelLoader.html
 
-	// Modify the joints velocity step by step for k=600 timesteps and dt=1/100s 
-	for (int k = 1; k < 600; k++)
-	{
-		t = k *0.01;	// t in seconds
-		if (k <= 100)
-		{
-			q_dot[0] = -0.01 * t;
-			q_dot[1] = -0.01 * t;	// radians
-			q_dot[2] = -0.01 * t;
-		}
-		else if (k <= 500)
-		{
-			q_dot[0] = -0.1;
-			q_dot[1] = -0.1;	// radians
-			q_dot[2] = -0.1;
-		}
-		else
-		{
-			q_dot[0] = -(0.1 - 0.01 *(t - 5));
-			q_dot[1] = -(0.1 - 0.01 *(t - 5));	// radians
-			q_dot[2] = -(0.1 - 0.01 *(t - 5));
-		}
+  // Assumes that a robot has been loaded
+  // One approach is to use a launch file
 
-		// Get the Jacobian
-		// ^^^^^^^^^^^^^^^^
-		// We can get the Jacobian from the :moveit_core:`RobotState`.
-		Eigen::Vector3d reference_point_position(0.0, 0.0, 0.0);
-		Eigen::MatrixXd jacobian;
+  robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
+  robot_model::RobotModelPtr kinematic_model = robot_model_loader.getModel();
+  ROS_INFO("Model frame: %s", kinematic_model->getModelFrame().c_str());
 
-		kinematic_state->getJacobian(joint_model_group,
-			kinematic_state->getLinkModel(joint_model_group->getLinkModelNames().back()),
-			reference_point_position, jacobian);
-		std::cout << "Jacobian: \n" << jacobian << "\n";
+  // Using the :moveit_core:`RobotModel`, we can construct a
+  // :moveit_core:`RobotState` that maintains the configuration
+  // of the robot. We will set all joints in the state to their
+  // default values. We can then get a
+  // :moveit_core:`JointModelGroup`, which represents the robot
+  // model for a particular group, e.g. the "pr_arm" of the robot
+  // robot.
 
-		// Calculate v and w and print them
-		vw = jacobian * q_dot;
-		v = vw.head(3);
-		w = vw.tail(3);
-		std::cout << "v = \n" << v << std::endl;
-		std::cout << "w = \n" << w << std::endl;
+  // Set the robot kinematic state
+  robot_state::RobotStatePtr kinematic_state(new robot_state::RobotState(kinematic_model));
 
-		// Calculate displacements and print them
-		delta_o = v * delta_t;
-		delta_theta = w * delta_t;
-		std::cout << "delta_o = \n" << delta_o << std::endl;
-		std::cout << "delta_theta = \n" << delta_theta << std::endl;
+  kinematic_state->setToDefaultValues();
 
-		// We can move the robot to desired coordinates using either joint values or coordinate displacements
-		// 1- Using coordinate displacements (Problematic for now):
-		/*
-		geometry_msgs::Pose target_pose;	// Define message
-		// Find end effector coordinates
-		const Eigen::Isometry3d& end_effector_state = kinematic_state->getGlobalLinkTransform("link4");
-		const Eigen::Vector4d origin(0,0,0,1); 
-		// Change the coordinates by using displacement
-		const Eigen::Vector3d end_effector_coordinates = (end_effector_state.matrix()*origin).head(3) + delta_o; 
-		// Stuff the new corrdinates to message
-		target_pose.position.x = end_effector_coordinates[0];
-		target_pose.position.y = end_effector_coordinates[1];
-		target_pose.position.z = end_effector_coordinates[2];
-		// Get the orientation in Euler angles
-		q_rot.setRPY(delta_theta[0], delta_theta[1], delta_theta[2]);
-		q_new = q_rot*q_orig; 	// Calculate the new orientation
-		q_new.normalize();
-		// Stuff the new rotation back into the target pose. This requires conversion into a msg type
-		tf2::convert(q_new, target_pose.orientation);
-		move_group.setPoseTarget(target_pose);	// set the target position
-		move_group.move();
-		*/
 
-		// 2- Move using joint values displacements
-		joint_group_positions[0] += q_dot[0] *delta_t;
-		joint_group_positions[1] += q_dot[1] *delta_t;
-		joint_group_positions[2] += q_dot[2] *delta_t;
+  //MoveIt operates on sets of joints called “planning groups” and stores them in an object called the JointModelGroup.
+  //Throughout MoveIt the terms “planning group” and “joint model group” are used interchangably.
+  const robot_state::JointModelGroup* joint_model_group = kinematic_model->getJointModelGroup("panda_arm");
 
-		kinematic_state->setJointGroupPositions(joint_model_group, joint_group_positions);
+  const std::vector<std::string>& joint_names = joint_model_group->getVariableNames();
 
-		move_group.setJointValueTarget(joint_group_positions);
-		move_group.move();
-		std::cout << "k = " << k << std::endl << std::endl;	// Print the step number
-	}
-	ros::shutdown();
-	return 0;
+  // Get Joint Values
+  // ^^^^^^^^^^^^^^^^
+  // We can retreive the current set of joint values stored in the state for the PR arm.
+  std::vector<double> joint_values;
+  kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
+  for (std::size_t i = 0; i < joint_names.size(); ++i)
+  {
+    ROS_INFO("Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
+  }
+
+  // Forward Kinematics
+  // ^^^^^^^^^^^^^^^^^^
+  // Now, we can compute forward kinematics for a set of random joint
+  // values. Note that we would like to find the pose of the
+  // "link4" which is the most distal link in the
+  // "panda_arm" group of the robot.
+
+  joint_values[0] = 3.14/6;
+  joint_values[1] = 3.14/6;
+  joint_values[2] = 0.5;
+
+  kinematic_state->setJointGroupPositions(joint_model_group, joint_values);
+
+  for (std::size_t i = 0; i < joint_names.size(); ++i)
+  {
+    ROS_INFO("Set joint %s to: %f", joint_names[i].c_str(), joint_values[i]);
+  }
+  const Eigen::Isometry3d& end_effector_state = kinematic_state->getGlobalLinkTransform("sag_ince");
+  /* Print end-effector transformation matrix. Remember that this is in the model frame */
+  ROS_INFO_STREAM("Transformation Matrix: \n" << end_effector_state.matrix() << "\n");
+  const Eigen::Vector4d origin(0,0,0,1); 
+  ROS_INFO_STREAM("Transformed Coordinates: \n" << end_effector_state.matrix()*origin << "\n");
+
+  // Inverse Kinematics
+  // ^^^^^^^^^^^^^^^^^^
+  // We can now solve inverse kinematics (IK) for the PR robot.
+  // To solve IK, we will need the following:
+  //
+  //  * The desired pose of the end-effector (by default, this is the last link in the "pr_arm" chain):
+  //    end_effector_state that we computed in the step above.
+  //  * The timeout: 0.1 s
+  double timeout = 0.1;
+  bool found_ik = kinematic_state->setFromIK(joint_model_group, end_effector_state, timeout);
+
+  // Now, we can print out the IK solution (if found):
+  if (found_ik)
+  {
+    kinematic_state->copyJointGroupPositions(joint_model_group, joint_values);
+    for (std::size_t i = 0; i < joint_names.size(); ++i)
+    {
+      ROS_INFO("Inverse Kinematics result: Joint %s: %f", joint_names[i].c_str(), joint_values[i]);
+    }
+  }
+  else
+  {
+    ROS_INFO("Did not find IK solution");
+  }
+
+  // Forward Kinematics 2
+  std::vector<double> joint_values2;
+  kinematic_state->copyJointGroupPositions(joint_model_group, joint_values2);
+  joint_values[0] = 3.14/6;
+  joint_values[1] = 3.14/6;
+  joint_values[2] = 0.5;
+
+  kinematic_state->setJointGroupPositions(joint_model_group, joint_values2);
+
+  for (std::size_t i = 0; i < joint_names.size(); ++i)
+  {
+    ROS_INFO("Set joint %s to: %f", joint_names[i].c_str(), joint_values2[i]);
+  }
+
+  const Eigen::Isometry3d& end_effector_state2 = kinematic_state->getGlobalLinkTransform("sag_ince");
+
+  /* Print end-effector transformation matrix. Remember that this is in the model frame */
+  ROS_INFO_STREAM("Transformation Matrix: \n" << end_effector_state2.matrix() << "\n");
+  ROS_INFO_STREAM("Transformed Coordinates: \n" << end_effector_state2.matrix()*origin << "\n");
+
+  // Inverse Kinematics 2
+  found_ik = kinematic_state->setFromIK(joint_model_group, end_effector_state2, timeout);
+  // Now, we can print out the IK solution (if found):
+  if (found_ik)
+  {
+    kinematic_state->copyJointGroupPositions(joint_model_group, joint_values2);
+    for (std::size_t i = 0; i < joint_names.size(); ++i)
+    {
+      ROS_INFO("Inverse Kinematics result: Joint %s: %f", joint_names[i].c_str(), joint_values2[i]);
+    }
+  }
+  else
+  {
+    ROS_INFO("Did not find IK solution");
+  }
+
+  static const std::string PLANNING_GROUP = "pr_move";
+  moveit::planning_interface::MoveGroupInterface move_group(PLANNING_GROUP);
+
+
+  
+  ros::shutdown();
+  return 0;
 }
